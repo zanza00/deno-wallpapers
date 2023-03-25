@@ -1,5 +1,11 @@
 {
-    "tasks": {
-      "start": "deno run -A cli.ts"
-    }
+  "tasks": {
+    "start": "deno run -A cli.ts"
+  },
+  "compilerOptions": {
+    "strict": true
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.181.0/"
   }
+}
