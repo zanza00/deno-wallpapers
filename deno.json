@@ -6,6 +6,8 @@
     "strict": true
   },
   "imports": {
-    "std/": "https://deno.land/std@0.181.0/"
+    "std/": "https://deno.land/std@0.181.0/",
+    "chksum": "https://deno.land/x/checksum@1.4.0/mod.ts",
+    "imagemagick": "https://deno.land/x/imagemagick_deno@0.0.19/mod.ts"
   }
 }
