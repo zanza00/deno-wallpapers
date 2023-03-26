@@ -5,7 +5,7 @@ if (import.meta.main) {
   for (const arg of Deno.args) {
     console.log(arg);
   }
-  program().then(() => {
-    console.log("finished");
+  program().then((fn) => {
+    fn();
   });
 }

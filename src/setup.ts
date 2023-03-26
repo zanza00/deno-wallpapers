@@ -18,9 +18,12 @@ export async function setup() {
     file: true,
     std_out: true,
   });
-  async function teardown() {
-    await cache.teardown();
-    await logger.teardown();
+  function teardown(message: string) {
+    return async () => {
+      await cache.teardown();
+      await logger.log(message);
+      await logger.teardown();
+    };
   }
 
   await cache.init();

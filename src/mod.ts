@@ -7,7 +7,7 @@ import {
 } from "./utils.ts";
 import { setup } from "./setup.ts";
 
-export async function program(): Promise<void> {
+export async function program(): Promise<() => Promise<void>> {
   const { cache, logger, ...config } = await setup();
 
   const dirs: string[] = [];
@@ -19,6 +19,7 @@ export async function program(): Promise<void> {
   const total_files = await get_numbers_of_files(config.wallpaper_folder);
   const chunk = Math.round(total_files / 100);
   const to_be_skipped = await cache.size();
+  logger.log(`Let's parse some files`, config.start_time.toISOString());
   logger.log(`Found ${total_files} files to handle`);
   logger.log(
     `of which present in cache ${to_be_skipped} (${
@@ -113,7 +114,7 @@ found ${dirs.length} dirs
     logger.log(`${error_count} found, see ${error_filename} file`);
   }
 
-  await config.teardown();
+  return config.teardown(`finished on ${new Date().toISOString()}`);
 }
 
 async function write_error_file(
