@@ -12,12 +12,12 @@ export async function setup() {
   const not_found_file = (await Deno.readFile(not_found_image_path))
     .toString();
   const not_found_hash = get_md5_hash(not_found_file);
-  const cache = new Cache();
   const logger = new Logger({
     date: start_time,
     file: true,
     std_out: true,
   });
+  const cache = new Cache({ logger });
   function teardown(message: string) {
     return async () => {
       await cache.teardown();
@@ -25,6 +25,13 @@ export async function setup() {
       await logger.teardown();
     };
   }
+
+  Deno.addSignalListener("SIGINT", async () => {
+    logger.log("interrupted, wait for proper exit");
+    logger.log("to exit immediately use CTRL+C again");
+    await teardown(`gracefully exiting on ${new Date().toISOString()}`)();
+    Deno.exit();
+  });
 
   await cache.init();
   return {

@@ -29,7 +29,7 @@ export class Logger {
     this.#enabled = this.#file !== false || this.#std_out;
   }
   // deno-lint-ignore no-explicit-any
-  async log(...args: any[]) {
+  log(...args: any[]) {
     if (!this.#enabled) return;
 
     this.#messages.push(args.join());
@@ -37,17 +37,18 @@ export class Logger {
     if (this.#std_out) {
       console.log(...args);
     }
-    if (this.#flush_after === this.#messages.length) {
-      await this.write();
+    if (this.#flush_after < this.#messages.length) {
+      this.write();
     }
   }
 
   async write(): Promise<void> {
     if (this.#file !== false) {
-      await Deno.writeTextFile(this.#file, this.#messages.join("\n"), {
+      const msgs = this.#messages.splice(0, this.#messages.length);
+      console.log(`msgs`, msgs);
+      await Deno.writeTextFile(this.#file, msgs.join("\n"), {
         append: true,
       });
-      this.#messages.splice(0, this.#messages.length);
     }
   }
 

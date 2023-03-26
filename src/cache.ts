@@ -1,4 +1,5 @@
 import * as path from "std/path/win32.ts";
+import { Logger } from "./logger.ts";
 
 const cache_file_path = path.resolve("./cache/cache_file.json");
 const cache_dir_path = path.resolve("./cache");
@@ -21,9 +22,11 @@ const empty_cache: CacheData = {
 export class Cache {
   #files: CacheData["files"];
   #meta: CacheData["meta"];
-  constructor() {
+  #logger: Logger;
+  constructor({ logger }: { logger: Logger }) {
     this.#files = empty_cache.files;
     this.#meta = empty_cache.meta;
+    this.#logger = logger;
   }
 
   async init(): Promise<void> {
@@ -37,13 +40,13 @@ export class Cache {
       ) {
         this.#files = parsed.files;
         this.#meta = parsed.meta;
-        console.log(`Cache found, last run on: ${this.#meta.last_run}`);
       }
     } catch (__error) {
       // emptyblock
     }
   }
   async teardown(): Promise<void> {
+    this.#logger.log(`Writing cache file to disk`);
     await this.save_progress();
   }
 
@@ -80,5 +83,9 @@ export class Cache {
       this.#files[key] = value;
       resolve(true);
     });
+  }
+
+  get_last_run() {
+    return this.#meta.last_run;
   }
 }

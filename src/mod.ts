@@ -18,14 +18,18 @@ export async function program(): Promise<() => Promise<void>> {
   let skipped = 0;
   const total_files = await get_numbers_of_files(config.wallpaper_folder);
   const chunk = Math.round(total_files / 100);
-  const to_be_skipped = await cache.size();
+  const total_to_be_skipped = await cache.size();
   logger.log(`Let's parse some files`, config.start_time.toISOString());
   logger.log(`Found ${total_files} files to handle`);
-  logger.log(
-    `of which present in cache ${to_be_skipped} (${
-      percentage(to_be_skipped, total_files)
-    })`,
-  );
+  if (cache.get_last_run() === "never") {
+    logger.log(`No previous cache found...`);
+  } else {
+    logger.log(
+      `of which present in cache ${total_to_be_skipped} (${
+        percentage(total_to_be_skipped, total_files)
+      })`,
+    );
+  }
 
   for await (const entry of Deno.readDir(config.wallpaper_folder)) {
     if (entry.isDirectory) {
@@ -33,28 +37,42 @@ export async function program(): Promise<() => Promise<void>> {
     }
     if (entry.isFile) {
       try {
-        const fromCache = await cache.get(entry.name);
-        if (fromCache === null) {
+        const from_cache = await cache.get(entry.name);
+        if (from_cache === null) {
+          let to_be_deleted: false | string = false;
           const fullpath = path.resolve(config.wallpaper_folder, entry.name);
           const stats = await Deno.stat(fullpath);
           const content = await Deno.readFile(fullpath);
           const dimensions = get_image_dimensions(content);
           if (dimensions.width < 1920 || dimensions.height < 1080) {
+            const reason =
+              `too_small: [${dimensions.width}x${dimensions.height}]`;
             files.push({
               name: entry.name,
-              reason: `too_small: [${dimensions.width}x${dimensions.height}]`,
+              reason,
             });
+            to_be_deleted = reason;
           }
           // the file is somethink like 20kb, spare unnecessary calculations
           if (stats.size < 30_000) {
             const hash = get_md5_hash(content.toString());
+
             if (hash === config.not_found_hash) {
-              logger.log("found a not_found.png", fullpath);
-              files.push({ name: entry.name, reason: "not_found.jpg" });
+              const reason = "not_found.jpg";
+              files.push({ name: entry.name, reason });
+              to_be_deleted = reason;
             }
           }
-          cache.set({ key: entry.name, value: "" });
+          cache.set({
+            key: entry.name,
+            value: to_be_deleted ? to_be_deleted : "",
+          });
         } else {
+          if (from_cache !== "") {
+            files.push({ name: entry.name, reason: `${from_cache} [cache]` });
+            logger.log(`found a file to delete from cache -> ${entry.name}`);
+            logger.log(`                                  -> ${from_cache}`);
+          }
           skipped++;
         }
       } catch (error) {
@@ -69,19 +87,19 @@ export async function program(): Promise<() => Promise<void>> {
     }
     count++;
     if (
-      count > to_be_skipped &&
+      count > total_to_be_skipped &&
       skipped !== count &&
       count % chunk === 0
     ) {
-      const to_log = `${count}/${total_files} (${
-        percentage(count, total_files)
-      }) files processed [of which ${skipped} were skipped]
-found ${dirs.length} dirs
-      ${files.length} files to delete
-`;
-      logger.log(to_log);
+      logger.log(
+        `${count}/${total_files} (${
+          percentage(count, total_files)
+        }) files processed [of which ${skipped} were skipped]`,
+      );
+      logger.log(`found ${dirs.length} dirs`);
+      logger.log(`      ${files.length} files to delete`);
 
-      await cache.save_progress();
+      cache.save_progress();
     }
   }
 
@@ -141,6 +159,7 @@ ${String(error)}`;
   });
 }
 
+// dumb but superfast method
 async function get_numbers_of_files(dir: string) {
   let count = 0;
   for await (const _entry of Deno.readDir(dir)) {
