@@ -45,8 +45,8 @@ export class Logger {
   async write(): Promise<void> {
     if (this.#file !== false) {
       const msgs = this.#messages.splice(0, this.#messages.length);
-      console.log(`msgs`, msgs);
-      await Deno.writeTextFile(this.#file, msgs.join("\n"), {
+      // ensure that a new line is always present so we preserve the log lines
+      await Deno.writeTextFile(this.#file, msgs.concat('').join("\n"), {
         append: true,
       });
     }
