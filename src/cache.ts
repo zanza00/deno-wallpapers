@@ -19,14 +19,14 @@ const empty_cache: CacheData = {
 };
 
 export class Cache {
-  private files: CacheData["files"];
-  meta: CacheData["meta"];
+  #files: CacheData["files"];
+  #meta: CacheData["meta"];
   constructor() {
-    this.files = empty_cache.files;
-    this.meta = empty_cache.meta;
+    this.#files = empty_cache.files;
+    this.#meta = empty_cache.meta;
   }
 
-  init = async () => {
+  async init(): Promise<void> {
     try {
       const filecontent = await Deno.readTextFile(cache_file_path);
       const parsed = JSON.parse(filecontent);
@@ -35,22 +35,28 @@ export class Cache {
         typeof parsed.meta === "object" && "last_run" in parsed.meta &&
         typeof parsed.files === "object"
       ) {
-        this.files = parsed.files;
-        this.meta = parsed.meta;
-        console.log(`Cache found, last run on: ${this.meta.last_run}`);
+        this.#files = parsed.files;
+        this.#meta = parsed.meta;
+        console.log(`Cache found, last run on: ${this.#meta.last_run}`);
       }
     } catch (__error) {
       // emptyblock
     }
-  };
-  teardown = async () => {
+  }
+  async teardown(): Promise<void> {
     await this.save_progress();
-  };
+  }
 
-  save_progress = async () => {
+  size(): Promise<number> {
+    return new Promise<number>((resolve) => {
+      resolve(Object.keys(this.#files).length);
+    });
+  }
+
+  async save_progress(): Promise<void> {
     try {
       const cache_data: CacheData = {
-        files: this.files,
+        files: this.#files,
         meta: {
           last_run: new Date().toISOString(),
           version: 1,
@@ -61,18 +67,18 @@ export class Cache {
     } catch (error) {
       return Promise.reject(error);
     }
-  };
+  }
 
-  get = (n: string): Promise<string | null> => {
+  get(n: string): Promise<string | null> {
     return new Promise((resolve) => {
-      const found = this.files[n];
+      const found = this.#files[n];
       resolve(found ?? null);
     });
-  };
-  set = ({ key, value }: { key: string; value: string }): Promise<boolean> => {
+  }
+  set({ key, value }: { key: string; value: string }): Promise<boolean> {
     return new Promise((resolve) => {
-      this.files[key] = value;
+      this.#files[key] = value;
       resolve(true);
     });
-  };
+  }
 }

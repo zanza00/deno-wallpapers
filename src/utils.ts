@@ -10,3 +10,11 @@ export function get_image_dimensions(data: Uint8Array) {
     return { width: img.width, height: img.height };
   });
 }
+
+export function percentage(count: number, total_files: number): string {
+  return (count / total_files * 100).toFixed(2) + "%";
+}
+
+export function date_file_fmt(d: Date) {
+  return d.toISOString().replaceAll(":", "-");
+}

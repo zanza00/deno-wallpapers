@@ -1,17 +1,32 @@
 import * as path from "std/path/win32.ts";
-import { get_image_dimensions, get_md5_hash } from "./utils.ts";
+import {
+  date_file_fmt,
+  get_image_dimensions,
+  get_md5_hash,
+  percentage,
+} from "./utils.ts";
 import { setup } from "./setup.ts";
 
 export async function program(): Promise<void> {
-  const config = await setup();
-  const wlp = config.wallpaper_folder;
-  const cache = config.cache;
+  const { cache, logger, ...config } = await setup();
+
   const dirs: string[] = [];
-  const errors = [];
+  let error_count = 0;
   const files: { name: string; reason: string }[] = [];
+  const error_filename = `errors-${date_file_fmt(config.start_time)}.txt`;
   let count = 0;
   let skipped = 0;
-  for await (const entry of Deno.readDir(wlp)) {
+  const total_files = await get_numbers_of_files(config.wallpaper_folder);
+  const chunk = Math.round(total_files / 100);
+  const to_be_skipped = await cache.size();
+  logger.log(`Found ${total_files} files to handle`);
+  logger.log(
+    `of which present in cache ${to_be_skipped} (${
+      percentage(to_be_skipped, total_files)
+    })`,
+  );
+
+  for await (const entry of Deno.readDir(config.wallpaper_folder)) {
     if (entry.isDirectory) {
       dirs.push(entry.name);
     }
@@ -19,7 +34,7 @@ export async function program(): Promise<void> {
       try {
         const fromCache = await cache.get(entry.name);
         if (fromCache === null) {
-          const fullpath = path.resolve(wlp, entry.name);
+          const fullpath = path.resolve(config.wallpaper_folder, entry.name);
           const stats = await Deno.stat(fullpath);
           const content = await Deno.readFile(fullpath);
           const dimensions = get_image_dimensions(content);
@@ -33,7 +48,7 @@ export async function program(): Promise<void> {
           if (stats.size < 30_000) {
             const hash = get_md5_hash(content.toString());
             if (hash === config.not_found_hash) {
-              console.log("found a not_found.png", fullpath);
+              logger.log("found a not_found.png", fullpath);
               files.push({ name: entry.name, reason: "not_found.jpg" });
             }
           }
@@ -42,48 +57,93 @@ export async function program(): Promise<void> {
           skipped++;
         }
       } catch (error) {
-        console.error(error);
-        errors.push(error);
+        error_count++;
+        await write_error_file({
+          entry,
+          error,
+          error_filename,
+          date: config.start_time,
+        });
       }
     }
     count++;
-    if (skipped + 1 === count) {
-      console.log(
-        `Skipped ${skipped} files, resuming from file #${count} -> "${entry.name}"`,
-      );
-    }
-    if (skipped !== count && count % 100 === 0) {
-      console.log(
-        `${count} files processed [of which ${skipped} were skipped]`,
-      );
-      console.log(`found ${dirs.length} dirs`);
-      console.log(`      ${files.length} files to delete`);
+    if (
+      count > to_be_skipped &&
+      skipped !== count &&
+      count % chunk === 0
+    ) {
+      const to_log = `${count}/${total_files} (${
+        percentage(count, total_files)
+      }) files processed [of which ${skipped} were skipped]
+found ${dirs.length} dirs
+      ${files.length} files to delete
+`;
+      logger.log(to_log);
+
       await cache.save_progress();
     }
   }
 
-  console.log(`found ${dirs.length} dirs`);
-  console.log(`found ${files.length} not_found_image`);
+  logger.log(
+    `found ${dirs.length} (${percentage(dirs.length, total_files)}) dirs`,
+  );
+  logger.log(
+    `found ${files.length} (${percentage(files.length, total_files)}) files`,
+  );
 
   for (const dir of dirs) {
     try {
-      console.log(`[DIR] removing ${dir}`);
-      await Deno.remove(path.join(wlp, dir), { recursive: true });
+      logger.log(`[DIR] removing ${dir}`);
+      await Deno.remove(path.join(config.wallpaper_folder, dir), {
+        recursive: true,
+      });
     } catch (error) {
       console.error(error);
     }
   }
   for (const f of files) {
     try {
-      console.log(`[files] removing ${f.name} because: ${f.reason}`);
-      await Deno.remove(path.join(wlp, f.name));
+      logger.log(`[files] removing ${f.name} because: ${f.reason}`);
+      await Deno.remove(path.join(config.wallpaper_folder, f.name));
     } catch (error) {
       console.error(error);
     }
   }
-  errors.forEach((e) => {
-    console.log(e);
-    Deno.writeTextFile("errors.txt", e.toString(), { append: true });
+  if (error_count > 0) {
+    logger.log(`${error_count} found, see ${error_filename} file`);
+  }
+
+  await config.teardown();
+}
+
+async function write_error_file(
+  { entry, error, error_filename, date }: {
+    entry: Deno.DirEntry;
+    error: unknown;
+    error_filename: string;
+    date: Date;
+  },
+) {
+  let content = `${entry.name} on ${date.toISOString()}`;
+  if (error instanceof Error) {
+    content = `${content} 
+${error.name}
+${error.message}
+${error.stack}
+`;
+  } else {
+    content = `${content}
+${String(error)}`;
+  }
+  await Deno.writeTextFile(error_filename, content, {
+    append: true,
   });
-  await cache.teardown();
+}
+
+async function get_numbers_of_files(dir: string) {
+  let count = 0;
+  for await (const _entry of Deno.readDir(dir)) {
+    count++;
+  }
+  return count;
 }
