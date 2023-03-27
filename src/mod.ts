@@ -1,25 +1,26 @@
 import * as path from "std/path/win32.ts";
-import {
-  date_file_fmt,
-  get_image_dimensions,
-  get_md5_hash,
-  percentage,
-} from "./utils.ts";
+import { get_image_dimensions, get_md5_hash, percentage } from "./utils.ts";
 import { setup } from "./setup.ts";
 
 export async function program(): Promise<() => Promise<void>> {
-  const { cache, logger, ...config } = await setup();
+  const { cache, logger, errorHandler: eh, ...config } = await setup();
 
   const dirs: string[] = [];
-  let error_count = 0;
   const files: { name: string; reason: string }[] = [];
-  const error_filename = `errors-${date_file_fmt(config.start_time)}.txt`;
+
+  let error_count = 0;
   let count = 0;
   let skipped = 0;
+
+  let first_of_which_skipped_message = true;
+
   const total_files = await get_numbers_of_files(config.wallpaper_folder);
   const chunk = Math.round(total_files / 100);
   const total_to_be_skipped = await cache.size();
-  logger.log(`Let's parse some files`, config.start_time.toISOString());
+  logger.log(
+    `Let's parse some files, starting on:`,
+    config.start_time.toISOString(),
+  );
   logger.log(`Found ${total_files} files to handle`);
   if (cache.get_last_run() === "never") {
     logger.log(`No previous cache found...`);
@@ -77,11 +78,9 @@ export async function program(): Promise<() => Promise<void>> {
         }
       } catch (error) {
         error_count++;
-        await write_error_file({
+        await eh.write_error_file({
           entry,
           error,
-          error_filename,
-          date: config.start_time,
         });
       }
     }
@@ -92,12 +91,22 @@ export async function program(): Promise<() => Promise<void>> {
       count % chunk === 0
     ) {
       logger.log(
-        `${count}/${total_files} (${
-          percentage(count, total_files)
-        }) files processed [of which ${skipped} were skipped]`,
+        `${percentage(count, total_files)} files processed`.concat(
+          first_of_which_skipped_message
+            ? ` [of which ${
+              percentage(skipped, total_files)
+            } were skipped due to be already present in the cache]`
+            : "",
+        ),
       );
-      logger.log(`found ${dirs.length} dirs`);
-      logger.log(`      ${files.length} files to delete`);
+      if (first_of_which_skipped_message) {
+        first_of_which_skipped_message = false;
+      }
+      if (dirs.length + files.length > 0) {
+        logger.log(
+          `found ${dirs.length} dirs and ${files.length} files to delete`,
+        );
+      }
 
       cache.save_progress();
     }
@@ -129,37 +138,13 @@ export async function program(): Promise<() => Promise<void>> {
     }
   }
   if (error_count > 0) {
-    logger.log(`${error_count} found, see ${error_filename} file`);
+    logger.log(`${error_count} found, see ${eh.get_error_filename()} file`);
   }
 
   return config.teardown(`finished on ${new Date().toISOString()}`);
 }
 
-async function write_error_file(
-  { entry, error, error_filename, date }: {
-    entry: Deno.DirEntry;
-    error: unknown;
-    error_filename: string;
-    date: Date;
-  },
-) {
-  let content = `${entry.name} on ${date.toISOString()}`;
-  if (error instanceof Error) {
-    content = `${content} 
-${error.name}
-${error.message}
-${error.stack}
-`;
-  } else {
-    content = `${content}
-${String(error)}`;
-  }
-  await Deno.writeTextFile(error_filename, content, {
-    append: true,
-  });
-}
-
-// dumb but superfast method
+// dumb but superfast method, under 100 ms
 async function get_numbers_of_files(dir: string) {
   let count = 0;
   for await (const _entry of Deno.readDir(dir)) {

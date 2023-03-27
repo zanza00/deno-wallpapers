@@ -87,6 +87,9 @@
     "https://deno.land/x/imagemagick_deno@0.0.19/src/statistics.ts": "a9122f555b565d9869dcc9070d77febc54f2e12324932c6b8619e1a94b599885",
     "https://deno.land/x/imagemagick_deno@0.0.19/src/virtual-pixel-method.ts": "ae2f0520e05b382299e4d41f4d7e2c67baf727ef7c816037e601c978948b1451",
     "https://deno.land/x/imagemagick_deno@0.0.19/src/wasm/magick.ts": "b5ec7d6c3c7379f8f9ba0c23238f7024aa35f3a15edb2d1cbca4ccc44a186ac9",
-    "https://deno.land/x/imagemagick_deno@0.0.19/src/wasm/magick_native.js": "2203872b5a96cb5a96c596898849a862b2ba083455ed0f3a445ba060f8e13f82"
+    "https://deno.land/x/imagemagick_deno@0.0.19/src/wasm/magick_native.js": "2203872b5a96cb5a96c596898849a862b2ba083455ed0f3a445ba060f8e13f82",
+    "https://esm.sh/date-fns@2.29.3": "970f9f3c93a20fddec93c15e581aeddbffad48540975f65fd79fbe3a005d8d50",
+    "https://esm.sh/v113/date-fns@2.29.3/deno/date-fns.mjs": "2f3f18e2042e44229d6496ed86ca40109361508b671d74111780252afbe85c9d",
+    "https://esm.sh/v113/date-fns@2.29.3/typings.d.ts": "00a2a0751ca2e2443834f51d43bd52b24c3ab27799a0d4456c1dc950c6cdfff3"
   }
 }

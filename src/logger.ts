@@ -46,13 +46,24 @@ export class Logger {
     if (this.#file !== false) {
       const msgs = this.#messages.splice(0, this.#messages.length);
       // ensure that a new line is always present so we preserve the log lines
-      await Deno.writeTextFile(this.#file, msgs.concat('').join("\n"), {
+      await Deno.writeTextFile(this.#file, msgs.concat("").join("\n"), {
         append: true,
       });
     }
   }
 
-  async teardown(): Promise<void> {
+  /**
+   * @param message one last message before finishing everything
+   * @returns
+   */
+  async teardown(message?: string): Promise<void> {
+    if (!this.#enabled) return;
+    if (message !== undefined) {
+      this.#messages.push(message);
+      if (this.#std_out) {
+        console.log(message);
+      }
+    }
     await this.write();
   }
 }

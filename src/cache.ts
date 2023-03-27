@@ -46,7 +46,6 @@ export class Cache {
     }
   }
   async teardown(): Promise<void> {
-    this.#logger.log(`Writing cache file to disk`);
     await this.save_progress();
   }
 
