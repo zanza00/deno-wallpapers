@@ -1,5 +1,5 @@
 import * as path from "std/path/win32.ts";
-import { get_image_dimensions, get_md5_hash, percentage } from "./utils.ts";
+import { get_elapsed_time, get_image_dimensions, get_md5_hash, percentage } from "./utils.ts";
 import { setup } from "./setup.ts";
 
 export async function program(): Promise<() => Promise<void>> {
@@ -15,7 +15,7 @@ export async function program(): Promise<() => Promise<void>> {
   let first_of_which_skipped_message = true;
 
   const total_files = await get_numbers_of_files(config.wallpaper_folder);
-  const chunk = Math.round(total_files / 100);
+  const chunk = Math.round(total_files / 99);
   const total_to_be_skipped = await cache.size();
   logger.log(
     `Let's parse some files, starting on:`,
@@ -96,7 +96,7 @@ export async function program(): Promise<() => Promise<void>> {
             ? ` [of which ${
               percentage(skipped, total_files)
             } were skipped due to be already present in the cache]`
-            : "",
+            : ` {${get_elapsed_time(config.start_time, new Date())}}`,
         ),
       );
       if (first_of_which_skipped_message) {

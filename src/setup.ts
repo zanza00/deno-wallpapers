@@ -1,10 +1,9 @@
-import { get_md5_hash } from "./utils.ts";
+import { get_elapsed_time, get_md5_hash } from "./utils.ts";
 import * as path from "std/path/win32.ts";
 import { initializeImageMagick } from "imagemagick";
 import { Cache } from "./cache.ts";
 import { Logger } from "./logger.ts";
 import { ErrorHandler } from "./errors.ts";
-import { formatDuration, getMilliseconds, intervalToDuration } from "date-fns";
 
 const not_found_image_path = path.resolve(".\\assets\\not_found.png");
 
@@ -27,16 +26,11 @@ export async function setup() {
   function teardown(message: string) {
     return async () => {
       const end = new Date();
-      const duration = intervalToDuration({
-        start: start_time,
-        end,
-      });
+      const elapsed = get_elapsed_time(start_time, end);
 
       logger.log(
         `finished on ${end.toISOString()}
-time elapsed: ${duration.seconds === 0 ? "" : formatDuration(duration)}`.concat(
-          ` ${getMilliseconds(end - start_time)} milliseconds`,
-        ),
+time elapsed: ${elapsed}`,
       );
       await cache.teardown();
       await logger.teardown(message);
@@ -46,7 +40,9 @@ time elapsed: ${duration.seconds === 0 ? "" : formatDuration(duration)}`.concat(
   Deno.addSignalListener("SIGINT", async () => {
     logger.log("to exit immediately use CTRL+C again");
     await teardown(`gracefully exiting`)();
-    Deno.exit();
+    setTimeout(() => {
+      Deno.exit();
+    }, 300);
   });
 
   await cache.init();
