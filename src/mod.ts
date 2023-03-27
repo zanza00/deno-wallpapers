@@ -1,7 +1,8 @@
-import * as path from "std/path/win32.ts";
+import * as path from "std/path/mod.ts";
 import { get_elapsed_time, percentage } from "./utils.ts";
 import { setup } from "./setup.ts";
 import { setup_handle_file } from "./handle_file.ts";
+import { differenceInSeconds } from "date-fns";
 
 export async function program(): Promise<() => Promise<void>> {
   const { cache, logger, errorHandler: eh, ...config } = await setup();
@@ -13,7 +14,7 @@ export async function program(): Promise<() => Promise<void>> {
   let count = 0;
   let skipped = 0;
 
-  let first_of_which_skipped_message = true;
+  let last_message_time = new Date();
 
   const total_files = await get_numbers_of_files(config.wallpaper_folder);
   const chunk = Math.round(total_files / 99);
@@ -27,7 +28,7 @@ export async function program(): Promise<() => Promise<void>> {
     logger.log(`No previous cache found...`);
   } else {
     logger.log(
-      `of which present in cache ${cache_size} (${
+      `cache contains ${cache_size} files (${
         percentage(cache_size, total_files)
       })`,
     );
@@ -53,27 +54,24 @@ export async function program(): Promise<() => Promise<void>> {
       ));
     }
     count++;
+
     if (
       count % chunk === 0 &&
-      skipped !== count
+      differenceInSeconds(new Date(), last_message_time) > 5
     ) {
       logger.log(
-        `${percentage(count, total_files)} files processed`.concat(
-          first_of_which_skipped_message
-            ? ` [of which ${
-              percentage(skipped, total_files)
-            } were skipped due to be already present in the cache]`
-            : ` {${get_elapsed_time(config.start_time, new Date())}}`,
-        ),
+        `${percentage(count, total_files)} files processed [elapsed time: ${
+          get_elapsed_time(config.start_time, new Date())
+        }]`,
       );
-      if (first_of_which_skipped_message) {
-        first_of_which_skipped_message = false;
-      }
+
       if (dirs.length + files.length > 0) {
         logger.log(
           `found ${dirs.length} dirs and ${files.length} files to delete`,
         );
       }
+
+      last_message_time = new Date();
 
       cache.save_progress({ prune: false });
     }

@@ -1,4 +1,4 @@
-import * as path from "std/path/win32.ts";
+import * as path from "std/path/mod.ts";
 import { get_image_dimensions, get_md5_hash } from "./utils.ts";
 import { Cache } from "./cache.ts";
 import { ErrorHandler } from "./errors.ts";

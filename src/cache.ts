@@ -1,4 +1,4 @@
-import * as path from "std/path/win32.ts";
+import * as path from "std/path/mod.ts";
 import { Logger } from "./logger.ts";
 
 const cache_file_path = path.resolve("./cache/cache_file.json");

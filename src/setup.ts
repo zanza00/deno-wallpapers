@@ -1,5 +1,5 @@
 import { get_elapsed_time, get_md5_hash } from "./utils.ts";
-import * as path from "std/path/win32.ts";
+import * as path from "std/path/mod.ts";
 import { initializeImageMagick } from "imagemagick";
 import { Cache } from "./cache.ts";
 import { Logger } from "./logger.ts";
