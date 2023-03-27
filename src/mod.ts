@@ -1,6 +1,7 @@
 import * as path from "std/path/win32.ts";
-import { get_elapsed_time, get_image_dimensions, get_md5_hash, percentage } from "./utils.ts";
+import { get_elapsed_time, percentage } from "./utils.ts";
 import { setup } from "./setup.ts";
+import { setup_handle_file } from "./handle_file.ts";
 
 export async function program(): Promise<() => Promise<void>> {
   const { cache, logger, errorHandler: eh, ...config } = await setup();
@@ -32,57 +33,24 @@ export async function program(): Promise<() => Promise<void>> {
     );
   }
 
+  const handle_file = setup_handle_file({
+    cache,
+    config,
+    files,
+    logger,
+    skipped,
+    error_count,
+    eh,
+  });
+
   for await (const entry of Deno.readDir(config.wallpaper_folder)) {
     if (entry.isDirectory) {
       dirs.push(entry.name);
     }
     if (entry.isFile) {
-      try {
-        const from_cache = await cache.get(entry.name);
-        if (from_cache === null) {
-          let to_be_deleted: false | string = false;
-          const fullpath = path.resolve(config.wallpaper_folder, entry.name);
-          const stats = await Deno.stat(fullpath);
-          const content = await Deno.readFile(fullpath);
-          const dimensions = get_image_dimensions(content);
-          if (dimensions.width < 1920 || dimensions.height < 1080) {
-            const reason =
-              `too_small: [${dimensions.width}x${dimensions.height}]`;
-            files.push({
-              name: entry.name,
-              reason,
-            });
-            to_be_deleted = reason;
-          }
-          // the file is somethink like 20kb, spare unnecessary calculations
-          if (stats.size < 30_000) {
-            const hash = get_md5_hash(content.toString());
-
-            if (hash === config.not_found_hash) {
-              const reason = "not_found.jpg";
-              files.push({ name: entry.name, reason });
-              to_be_deleted = reason;
-            }
-          }
-          cache.set({
-            key: entry.name,
-            value: to_be_deleted ? to_be_deleted : "",
-          });
-        } else {
-          if (from_cache !== "") {
-            files.push({ name: entry.name, reason: `${from_cache} [cache]` });
-            logger.log(`found a file to delete from cache -> ${entry.name}`);
-            logger.log(`                                  -> ${from_cache}`);
-          }
-          skipped++;
-        }
-      } catch (error) {
-        error_count++;
-        await eh.write_error_file({
-          entry,
-          error,
-        });
-      }
+      ({ skipped, error_count } = await handle_file(
+        entry,
+      ));
     }
     count++;
     if (
@@ -111,13 +79,16 @@ export async function program(): Promise<() => Promise<void>> {
       cache.save_progress();
     }
   }
-
-  logger.log(
-    `found ${dirs.length} (${percentage(dirs.length, total_files)}) dirs`,
-  );
-  logger.log(
-    `found ${files.length} (${percentage(files.length, total_files)}) files`,
-  );
+  if (dirs.length + files.length > 0) {
+    logger.log(
+      `found ${dirs.length} (${percentage(dirs.length, total_files)}) dirs`,
+    );
+    logger.log(
+      `found ${files.length} (${percentage(files.length, total_files)}) files`,
+    );
+  } else {
+    logger.log(`Found noting to delete`);
+  }
 
   for (const dir of dirs) {
     try {
@@ -138,7 +109,9 @@ export async function program(): Promise<() => Promise<void>> {
     }
   }
   if (error_count > 0) {
-    logger.log(`${error_count} found, see ${eh.get_error_filename()} file`);
+    logger.log(
+      `${error_count} errors found, see ${eh.get_error_filename()} file`,
+    );
   }
 
   return config.teardown(`finished on ${new Date().toISOString()}`);

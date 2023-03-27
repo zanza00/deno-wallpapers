@@ -29,8 +29,7 @@ export async function setup() {
       const elapsed = get_elapsed_time(start_time, end);
 
       logger.log(
-        `finished on ${end.toISOString()}
-time elapsed: ${elapsed}`,
+        `time elapsed: ${elapsed}`,
       );
       await cache.teardown();
       await logger.teardown(message);

@@ -26,9 +26,13 @@ export function get_elapsed_time(start_time: Date, end: Date) {
     end,
   });
 
-  const elapsed = `${duration.seconds === 0 ? "" : formatDuration(duration)}`
-    .concat(
-      ` ${getMilliseconds(end - start_time)} milliseconds`,
-    );
-  return elapsed;
+  if (
+    (duration.seconds ?? 0) + (duration.minutes ?? 0) +
+        (duration.hours ?? 0) === 0
+  ) {
+    const diff = Number(end) - Number(start_time);
+    return `${getMilliseconds(diff)} milliseconds`;
+  }
+
+  return formatDuration(duration);
 }
