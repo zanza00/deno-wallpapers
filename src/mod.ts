@@ -17,7 +17,7 @@ export async function program(): Promise<() => Promise<void>> {
 
   const total_files = await get_numbers_of_files(config.wallpaper_folder);
   const chunk = Math.round(total_files / 99);
-  const total_to_be_skipped = await cache.size();
+  const cache_size = await cache.size();
   logger.log(
     `Let's parse some files, starting on:`,
     config.start_time.toISOString(),
@@ -27,8 +27,8 @@ export async function program(): Promise<() => Promise<void>> {
     logger.log(`No previous cache found...`);
   } else {
     logger.log(
-      `of which present in cache ${total_to_be_skipped} (${
-        percentage(total_to_be_skipped, total_files)
+      `of which present in cache ${cache_size} (${
+        percentage(cache_size, total_files)
       })`,
     );
   }
@@ -54,9 +54,8 @@ export async function program(): Promise<() => Promise<void>> {
     }
     count++;
     if (
-      count > total_to_be_skipped &&
-      skipped !== count &&
-      count % chunk === 0
+      count % chunk === 0 &&
+      skipped !== count
     ) {
       logger.log(
         `${percentage(count, total_files)} files processed`.concat(
@@ -76,7 +75,7 @@ export async function program(): Promise<() => Promise<void>> {
         );
       }
 
-      cache.save_progress();
+      cache.save_progress({ prune: false });
     }
   }
   if (dirs.length + files.length > 0) {
@@ -114,7 +113,9 @@ export async function program(): Promise<() => Promise<void>> {
     );
   }
 
-  return config.teardown(`finished on ${new Date().toISOString()}`);
+  return config.teardown(`finished on ${new Date().toISOString()}`, {
+    prune: true,
+  });
 }
 
 // dumb but superfast method, under 100 ms

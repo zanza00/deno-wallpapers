@@ -45,8 +45,8 @@ export class Cache {
       // emptyblock
     }
   }
-  async teardown(): Promise<void> {
-    await this.save_progress();
+  async teardown({ prune }: { prune: boolean }): Promise<void> {
+    await this.save_progress({ prune });
   }
 
   size(): Promise<number> {
@@ -55,10 +55,26 @@ export class Cache {
     });
   }
 
-  async save_progress(): Promise<void> {
+  #get_files({ prune = false }: { prune: boolean }) {
+    if (prune) {
+      const files: Record<string, string> = {};
+      for (const key in this.#files) {
+        if (Object.prototype.hasOwnProperty.call(this.#files, key)) {
+          const element = this.#files[key];
+          if (element === "") {
+            files[key] = element;
+          }
+        }
+      }
+    }
+    return this.#files;
+  }
+
+  async save_progress({ prune = false }: { prune: boolean }): Promise<void> {
     try {
+      const files = this.#get_files({ prune });
       const cache_data: CacheData = {
-        files: this.#files,
+        files: files,
         meta: {
           last_run: new Date().toISOString(),
           version: 1,

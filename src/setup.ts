@@ -7,7 +7,20 @@ import { ErrorHandler } from "./errors.ts";
 
 const not_found_image_path = path.resolve(".\\assets\\not_found.png");
 
-export async function setup() {
+export type Config = {
+  logger: Logger;
+  start_time: Date;
+  not_found_hash: string;
+  wallpaper_folder: string;
+  cache: Cache;
+  teardown: (
+    message: string,
+    { prune }: { prune: boolean },
+  ) => () => Promise<void>;
+  errorHandler: ErrorHandler;
+};
+
+export async function setup(): Promise<Config> {
   await initializeImageMagick();
 
   const start_time = new Date();
@@ -23,7 +36,7 @@ export async function setup() {
   const cache = new Cache({ logger });
   const errorHandler = new ErrorHandler({ start_time });
 
-  function teardown(message: string) {
+  function teardown(message: string, { prune }: { prune: boolean }) {
     return async () => {
       const end = new Date();
       const elapsed = get_elapsed_time(start_time, end);
@@ -31,14 +44,14 @@ export async function setup() {
       logger.log(
         `time elapsed: ${elapsed}`,
       );
-      await cache.teardown();
+      await cache.teardown({ prune });
       await logger.teardown(message);
     };
   }
 
   Deno.addSignalListener("SIGINT", async () => {
     logger.log("to exit immediately use CTRL+C again");
-    await teardown(`gracefully exiting`)();
+    await teardown(`gracefully exiting`, { prune: false })();
     setTimeout(() => {
       Deno.exit();
     }, 300);
