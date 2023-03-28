@@ -1,19 +1,29 @@
 import * as path from "std/path/mod.ts";
 import { Logger } from "./logger.ts";
+import { z } from "zod";
+
+const cacheDataSchema = z.object({
+  meta: z.object({
+    last_run: z.string().datetime(),
+    last_exit: z.string(),
+    version: z.literal(1),
+  }),
+  files: z.record(z.string()),
+});
+
+type codec = z.infer<typeof cacheDataSchema>;
 
 const cache_file_path = path.resolve("./cache/cache_file.json");
 const cache_dir_path = path.resolve("./cache");
 
 type CacheData = {
-  meta: {
-    last_run: string;
-    version: number;
-  };
+  meta: codec["meta"];
   files: Record<string, string | undefined>;
 };
 const empty_cache: CacheData = {
   meta: {
-    last_run: "never",
+    last_run: "new_cache",
+    last_exit: "new_cache",
     version: 1,
   },
   files: {},
@@ -33,14 +43,10 @@ export class Cache {
     try {
       const filecontent = await Deno.readTextFile(cache_file_path);
       const parsed = JSON.parse(filecontent);
+      const zodded = cacheDataSchema.parse(parsed);
 
-      if (
-        typeof parsed.meta === "object" && "last_run" in parsed.meta &&
-        typeof parsed.files === "object"
-      ) {
-        this.#files = parsed.files;
-        this.#meta = parsed.meta;
-      }
+      this.#files = zodded.files;
+      this.#meta = zodded.meta;
     } catch (__error) {
       // emptyblock
     }
@@ -66,6 +72,7 @@ export class Cache {
           }
         }
       }
+      return files;
     }
     return this.#files;
   }
@@ -77,6 +84,7 @@ export class Cache {
         files: files,
         meta: {
           last_run: new Date().toISOString(),
+          last_exit: prune ? "clean" : "interrupted",
           version: 1,
         },
       };
