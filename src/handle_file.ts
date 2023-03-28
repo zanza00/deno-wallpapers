@@ -5,16 +5,19 @@ import { ErrorHandler } from "./errors.ts";
 import { Logger } from "./logger.ts";
 
 export function setup_handle_file(
-  { cache, config, files, logger, skipped, error_count, eh }: {
+  { cache, config, files, logger, skipped, error_count, processed, eh }: {
     cache: Cache;
     config: { wallpaper_folder: string; not_found_hash: string };
     files: { name: string; reason: string }[];
     logger: Logger;
     skipped: number;
     error_count: number;
+    processed: number;
     eh: ErrorHandler;
   },
-): (entry: Deno.DirEntry) => Promise<{ skipped: number; error_count: number }> {
+): (
+  entry: Deno.DirEntry,
+) => Promise<{ skipped: number; error_count: number; processed: number }> {
   return async (entry: Deno.DirEntry) => {
     try {
       const from_cache = await cache.get(entry.name);
@@ -45,7 +48,7 @@ export function setup_handle_file(
             to_be_deleted = reason;
           }
         }
-
+        processed++;
         cache.set({
           key: entry.name,
           value: to_be_deleted ? to_be_deleted : "",
@@ -65,6 +68,6 @@ export function setup_handle_file(
         error,
       });
     }
-    return { skipped, error_count };
+    return { skipped, error_count, processed };
   };
 }

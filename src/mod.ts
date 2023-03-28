@@ -12,6 +12,7 @@ export async function program(): Promise<() => Promise<void>> {
 
   let error_count = 0;
   let count = 0;
+  let processed = 0;
   let skipped = 0;
 
   let last_message_time = new Date();
@@ -41,6 +42,7 @@ export async function program(): Promise<() => Promise<void>> {
     logger,
     skipped,
     error_count,
+    processed,
     eh,
   });
 
@@ -49,7 +51,7 @@ export async function program(): Promise<() => Promise<void>> {
       dirs.push(entry.name);
     }
     if (entry.isFile) {
-      ({ skipped, error_count } = await handle_file(
+      ({ skipped, error_count, processed } = await handle_file(
         entry,
       ));
     }
@@ -76,6 +78,8 @@ export async function program(): Promise<() => Promise<void>> {
       cache.save_progress({ prune: false });
     }
   }
+  logger.log(`==========`)
+  logger.log(`Processed ${processed} new files`);
   if (dirs.length + files.length > 0) {
     logger.log(
       `found ${dirs.length} (${percentage(dirs.length, total_files)}) dirs`,
@@ -86,6 +90,7 @@ export async function program(): Promise<() => Promise<void>> {
   } else {
     logger.log(`Found noting to delete`);
   }
+
 
   for (const dir of dirs) {
     try {
