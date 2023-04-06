@@ -73,16 +73,18 @@ type LogConfig = {
   writeLogFile: boolean;
 };
 
+type ErrorConfig = {
+  errors: "full" | "none";
+  displayErrors: boolean;
+  writeErrorFile: false;
+};
+
 export type Config = {
   target: string; //_
 
   appFolder: string; // default target/cli_name
 
   cache: false | string; // deault cli_folder/cache.json
-
-  errors: "full" | "none";
-  displayErrors: boolean;
-  writeErrorFile: false | string;
 
   imagesToRemove: hash[];
 
@@ -93,7 +95,8 @@ export type Config = {
 
   maxWidth: number;
   maxHeight: number;
-} & LogConfig;
+} & LogConfig &
+  ErrorConfig;
 
 type hash = string;
 
@@ -120,19 +123,11 @@ function getLogs({
       writeLogFile: false,
     }))
     .with(
-      { log: undefined, display: P.select("display"), file: P.select("file") },
-      (data) => {
-        const logs =
-          data.display !== false || data.file !== false ? "full" : "none";
-        return {
-          logs,
-          displayLogs: data.display ?? true,
-          writeLogFile: data.file ?? true,
-        };
-      }
-    )
-    .with(
-      { log: true, display: P.select("display"), file: P.select("file") },
+      {
+        log: P.any,
+        display: P.select("display"),
+        file: P.select("file"),
+      },
       (data) => {
         const logs =
           data.display !== false || data.file !== false ? "full" : "none";
