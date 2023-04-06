@@ -4,28 +4,15 @@ import { initializeImageMagick } from "imagemagick";
 import { Cache } from "./cache.ts";
 import { Logger } from "./logger.ts";
 import { ErrorHandler } from "./errors.ts";
+import { get_config } from "./config.ts";
 
 const not_found_image_path = path.resolve(".\\assets\\not_found.png");
 
-export type Config = {
-  logger: Logger;
-  start_time: Date;
-  not_found_hash: string;
-  wallpaper_folder: string;
-  cache: Cache;
-  teardown: (
-    message: string,
-    { prune }: { prune: boolean },
-  ) => () => Promise<void>;
-  errorHandler: ErrorHandler;
-};
-
-export async function setup(): Promise<Config> {
-  await initializeImageMagick();
+export async function setup(raw_args: typeof Deno.args) {
+  const args = get_config(raw_args);
 
   const start_time = new Date();
-  const not_found_file = (await Deno.readFile(not_found_image_path))
-    .toString();
+  const not_found_file = (await Deno.readFile(not_found_image_path)).toString();
   const not_found_hash = get_md5_hash(not_found_file);
 
   const logger = new Logger({
@@ -41,9 +28,7 @@ export async function setup(): Promise<Config> {
       const end = new Date();
       const elapsed = get_elapsed_time(start_time, end);
 
-      logger.log(
-        `time elapsed: ${elapsed}`,
-      );
+      logger.log(`time elapsed: ${elapsed}`);
       await cache.teardown({ prune });
       await logger.teardown(message);
     };
@@ -58,6 +43,8 @@ export async function setup(): Promise<Config> {
   });
 
   await cache.init();
+  await initializeImageMagick();
+
   return {
     logger,
     start_time,

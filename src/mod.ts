@@ -4,8 +4,10 @@ import { setup } from "./setup.ts";
 import { setup_handle_file } from "./handle_file.ts";
 import { differenceInSeconds } from "date-fns";
 
-export async function program(): Promise<() => Promise<void>> {
-  const { cache, logger, errorHandler: eh, ...config } = await setup();
+export async function program(
+  raw_args: typeof Deno.args,
+): Promise<() => Promise<void>> {
+  const { cache, logger, errorHandler: eh, ...config } = await setup(raw_args);
 
   const dirs: string[] = [];
   const files: { name: string; reason: string }[] = [];

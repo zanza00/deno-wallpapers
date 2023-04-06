@@ -111,5 +111,21 @@
     "https://esm.sh/date-fns@2.29.3": "970f9f3c93a20fddec93c15e581aeddbffad48540975f65fd79fbe3a005d8d50",
     "https://esm.sh/v113/date-fns@2.29.3/deno/date-fns.mjs": "2f3f18e2042e44229d6496ed86ca40109361508b671d74111780252afbe85c9d",
     "https://esm.sh/v113/date-fns@2.29.3/typings.d.ts": "00a2a0751ca2e2443834f51d43bd52b24c3ab27799a0d4456c1dc950c6cdfff3"
+  },
+  "npm": {
+    "specifiers": {
+      "date-fns@2.29.3": "date-fns@2.29.3",
+      "ts-pattern@4.2.2": "ts-pattern@4.2.2"
+    },
+    "packages": {
+      "date-fns@2.29.3": {
+        "integrity": "sha512-dDCnyH2WnnKusqvZZ6+jA1O51Ibt8ZMRNkDZdyAyK4YfbDwa/cEmuztzG5pk6hqlp9aSBPYcjOlktquahGwGeA==",
+        "dependencies": {}
+      },
+      "ts-pattern@4.2.2": {
+        "integrity": "sha512-qzJMo2pbkUJWusRH5o8xR+xogn6RmvViyUgwBFTtRENLse470clCGjHDf6haWGZ1AOmk8XkEohUoBW8Uut6Scg==",
+        "dependencies": {}
+      }
+    }
   }
 }
