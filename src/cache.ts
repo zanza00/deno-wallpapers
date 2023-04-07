@@ -1,6 +1,6 @@
-import * as path from "std/path/mod.ts";
 import { Logger } from "./logger.ts";
 import { z } from "zod";
+import { Config } from "./config.ts";
 
 const cacheDataSchema = z.object({
   meta: z.object({
@@ -12,9 +12,6 @@ const cacheDataSchema = z.object({
 });
 
 type codec = z.infer<typeof cacheDataSchema>;
-
-const cache_file_path = path.resolve("./cache/cache_file.json");
-const cache_dir_path = path.resolve("./cache");
 
 type CacheData = {
   meta: codec["meta"];
@@ -33,26 +30,33 @@ export class Cache {
   #files: CacheData["files"];
   #meta: CacheData["meta"];
   #logger: Logger;
-  constructor({ logger }: { logger: Logger }) {
+  #config: Config;
+
+  constructor({ logger, config }: { logger: Logger; config: Config }) {
     this.#files = empty_cache.files;
     this.#meta = empty_cache.meta;
     this.#logger = logger;
+    this.#config = config;
   }
 
   async init(): Promise<void> {
     try {
-      const filecontent = await Deno.readTextFile(cache_file_path);
-      const parsed = JSON.parse(filecontent);
-      const zodded = cacheDataSchema.parse(parsed);
+      if (this.#config.cache !== false) {
+        const filecontent = await Deno.readTextFile(this.#config.cache);
+        const parsed = JSON.parse(filecontent);
+        const zodded = cacheDataSchema.parse(parsed);
 
-      this.#files = zodded.files;
-      this.#meta = zodded.meta;
+        this.#files = zodded.files;
+        this.#meta = zodded.meta;
+      }
     } catch (__error) {
       // emptyblock
     }
   }
   async teardown({ prune }: { prune: boolean }): Promise<void> {
-    await this.save_progress({ prune });
+    if (this.#config.cache !== false) {
+      await this.save_progress({ prune });
+    }
   }
 
   size(): Promise<number> {
@@ -78,20 +82,25 @@ export class Cache {
   }
 
   async save_progress({ prune = false }: { prune: boolean }): Promise<void> {
-    try {
-      const files = this.#get_files({ prune });
-      const cache_data: CacheData = {
-        files: files,
-        meta: {
-          last_run: new Date().toISOString(),
-          last_exit: prune ? "clean" : "interrupted",
-          version: 1,
-        },
-      };
-      await Deno.mkdir(cache_dir_path, { recursive: true });
-      await Deno.writeTextFile(cache_file_path, JSON.stringify(cache_data));
-    } catch (error) {
-      return Promise.reject(error);
+    if (this.#config.cache !== false) {
+      try {
+        const files = this.#get_files({ prune });
+        const cache_data: CacheData = {
+          files: files,
+          meta: {
+            last_run: new Date().toISOString(),
+            last_exit: prune ? "clean" : "interrupted",
+            version: 1,
+          },
+        };
+        await Deno.mkdir(this.#config.appFolder, { recursive: true });
+        await Deno.writeTextFile(
+          this.#config.cache,
+          JSON.stringify(cache_data)
+        );
+      } catch (error) {
+        return Promise.reject(error);
+      }
     }
   }
 

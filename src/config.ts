@@ -1,5 +1,5 @@
 import * as path from "std/path/mod.ts";
-import { any, z } from "zod";
+import { z } from "zod";
 import { parse } from "std/flags/mod.ts";
 import { match, P } from "ts-pattern";
 
@@ -8,25 +8,32 @@ const APP_NAME = `pixel_mage`;
 const boolean_or_path = z.union([z.string(), z.boolean()]).optional();
 
 export const AppArgs = z.object({
-  _: z.array(z.string()).max(1).optional(),
+  _: z
+    .array(z.string())
+    .length(1)
+    .default([Deno.cwd()])
+    .catch([Deno.cwd()])
+    .describe("I can only handle one directory right now"),
   config: z.string().optional(),
   "app-folder": z.string().optional(),
   cache: boolean_or_path,
-  log: z.boolean().optional(),
-  "display-log": z.boolean().optional(),
-  "file-log": z.boolean().optional(),
-  error: z.boolean().optional(),
-  "display-errors": z.boolean().optional(),
-  "file-errors": z.boolean().optional(),
-  quiet: z.boolean().optional(),
-  "images-to-remove": z.array(z.string()).optional(),
-  "min-width": z.number().optional(),
-  "min-height": z.number().optional(),
+  log: z.boolean().optional().default(true),
+  "file-log": z.boolean().optional().default(true),
+  error: z.boolean().optional().default(true),
+  "file-errors": z.boolean().optional().default(true),
+  quiet: z.boolean().optional().default(false),
+  "images-to-remove": z
+    .array(z.string())
+    .optional()
+    .default(["2d49be9a3b8ee992a77a4bf306cf076a"]),
+  "min-width": z.number().optional().default(1920),
+  "min-height": z.number().optional().default(1080),
   "over-max-action": z
-    .union([z.literal("resize"), z.literal("delete")])
-    .optional(),
-  "max-width": z.number().optional(),
-  "max-height": z.number().optional(),
+    .union([z.literal("resize"), z.literal("delete"), z.literal("none")])
+    .optional()
+    .default("none"),
+  "max-width": z.number().optional().default(5000),
+  "max-height": z.number().optional().default(5000),
 });
 type AppArgs = z.infer<typeof AppArgs>;
 
@@ -43,46 +50,56 @@ export function get_config(raw_args: typeof Deno.args) {
     },
     negatable: ["log", "error", "cache"],
   });
-  console.log({ raw_args, args });
   const parsed_args = AppArgs.safeParse(args);
   if (parsed_args.success) {
-    console.log(parsed_args.data);
+    const merged = mergeWithDefaults(parsed_args.data);
+    console.log("merged", merged);
+    return merged;
   } else {
     console.log(parsed_args.error);
+    return mergeWithDefaults(AppArgs.parse({}));
   }
-
-  return parsed_args;
 }
 
-function mergeDefaults(a: AppArgs): Config {
-  const targetFolder = (a._ ?? [Deno.cwd()])[0];
+function mergeWithDefaults(a: AppArgs): Config {
+  const target = a._[0];
   const appFolderName = a["app-folder"] ?? `.${APP_NAME}`;
 
-  const cache = getCache(a, targetFolder, appFolderName);
+  const cache = getCache(a, target, appFolderName);
+  const logs = getLogs(a);
+  const errors = getErrors(a);
 
   return {
-    target: targetFolder,
-    appFolder,
+    target,
+    appFolder: path.resolve(target, appFolderName),
+    appFolderName,
     cache,
+    ...logs,
+    ...errors,
+    imagesToRemove: a["images-to-remove"],
+    maxHeight: a["max-height"],
+    maxWidth: a["max-width"],
+    minHeight: a["min-height"],
+    minWidth: a["min-width"],
+    overMaxAction: a["over-max-action"],
   };
 }
 
 type LogConfig = {
-  logs: "full" | "none";
-  displayLogs: boolean;
+  logs: boolean;
   writeLogFile: boolean;
 };
 
 type ErrorConfig = {
-  errors: "full" | "none";
-  displayErrors: boolean;
-  writeErrorFile: false;
+  errors: boolean;
+  writeErrorFile: boolean;
 };
 
 export type Config = {
   target: string; //_
 
   appFolder: string; // default target/cli_name
+  appFolderName: string;
 
   cache: false | string; // deault cli_folder/cache.json
 
@@ -91,7 +108,7 @@ export type Config = {
   minWidth: number;
   minHeight: number;
 
-  overMaxAction: false | "resize" | "delete";
+  overMaxAction: "none" | "resize" | "delete";
 
   maxWidth: number;
   maxHeight: number;
@@ -111,32 +128,52 @@ function getCache(
     .otherwise(() => path.resolve(targetFolder, appFolderName, `.cache.json`));
 }
 
-function getLogs({
-  log,
-  "file-log": file,
-  "display-log": display,
-}: AppArgs): LogConfig {
-  return match({ log, file, display })
-    .with({ log: false, display: P.any, file: P.any }, () => ({
-      logs: "none" as const,
-      displayLogs: false,
+function getLogs({ log, "file-log": file, quiet }: AppArgs): LogConfig {
+  return match({ log, file, quiet })
+    .with({ quiet: true }, () => ({
+      logs: true,
+      writeLogFile: false,
+    }))
+    .with({ log: false, file: P.any }, () => ({
+      logs: true,
       writeLogFile: false,
     }))
     .with(
       {
-        log: P.any,
-        display: P.select("display"),
+        log: true,
         file: P.select("file"),
       },
-      (data) => {
-        const logs =
-          data.display !== false || data.file !== false ? "full" : "none";
-        return {
-          logs,
-          displayLogs: data.display ?? true,
-          writeLogFile: data.file ?? true,
-        };
-      }
+      (data) => ({
+        logs: true,
+        writeLogFile: data.file,
+      })
     )
-    .exhaustive() as LogConfig;
+    .exhaustive();
+}
+
+function getErrors({
+  quiet,
+  error,
+  "file-errors": file,
+}: AppArgs): ErrorConfig {
+  return match({ error, file, quiet })
+    .with({ quiet: true }, () => ({
+      errors: false,
+      writeErrorFile: false,
+    }))
+    .with({ error: false, file: P.any }, () => ({
+      errors: false,
+      writeErrorFile: false,
+    }))
+    .with(
+      {
+        error: true,
+        file: P.select("file"),
+      },
+      (data) => ({
+        errors: true,
+        writeErrorFile: data.file,
+      })
+    )
+    .exhaustive();
 }

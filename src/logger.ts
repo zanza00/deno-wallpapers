@@ -1,16 +1,20 @@
+import * as path from "std/path/mod.ts";
 import { date_file_fmt } from "./utils.ts";
+import { Config } from "./config.ts";
 
 type LoggerConfig = {
   std_out: boolean;
   date: Date;
 } & FileLoggerConfig;
 
-type FileLoggerConfig = {
-  file: false;
-} | {
-  file: true | string;
-  flush_after?: number;
-};
+type FileLoggerConfig =
+  | {
+      file: false;
+    }
+  | {
+      file: true | string;
+      flush_after?: number;
+    };
 
 export class Logger {
   #std_out: boolean;
@@ -19,11 +23,12 @@ export class Logger {
   #flush_after: number;
   #enabled: boolean;
 
-  constructor(args: LoggerConfig) {
+  constructor(args: LoggerConfig, config: Config) {
     this.#std_out = args.std_out;
-    this.#file = args.file === true
-      ? `log-${date_file_fmt(args.date)}.txt`
-      : args.file;
+    this.#file =
+      args.file === true
+        ? path.resolve(config.appFolder, `log-${date_file_fmt(args.date)}.txt`)
+        : args.file;
     this.#messages = [];
     this.#flush_after = args.file === false ? -1 : args.flush_after ?? 10;
     this.#enabled = this.#file !== false || this.#std_out;
