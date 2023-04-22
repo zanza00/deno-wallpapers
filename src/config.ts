@@ -10,8 +10,7 @@ const boolean_or_path = z.union([z.string(), z.boolean()]).optional();
 export const AppArgs = z.object({
   _: z
     .array(z.string())
-    .length(1)
-    .default([Deno.cwd()])
+    .min(1)
     .catch([Deno.cwd()])
     .describe("I can only handle one directory right now"),
   config: z.string().optional(),
@@ -53,16 +52,17 @@ export function get_config(raw_args: typeof Deno.args) {
   const parsed_args = AppArgs.safeParse(args);
   if (parsed_args.success) {
     const merged = mergeWithDefaults(parsed_args.data);
-    console.log("merged", merged);
+
     return merged;
   } else {
-    console.log(parsed_args.error);
+    console.warn(parsed_args.error);
     return mergeWithDefaults(AppArgs.parse({}));
   }
 }
 
 function mergeWithDefaults(a: AppArgs): Config {
   const target = a._[0];
+  const extraTargets = a._.slice(1);
   const appFolderName = a["app-folder"] ?? `.${APP_NAME}`;
 
   const cache = getCache(a, target, appFolderName);
@@ -71,6 +71,7 @@ function mergeWithDefaults(a: AppArgs): Config {
 
   return {
     target,
+    extraTargets,
     appFolder: path.resolve(target, appFolderName),
     appFolderName,
     cache,
@@ -97,6 +98,7 @@ type ErrorConfig = {
 
 export type Config = {
   target: string; //_
+  extraTargets: string[];
 
   appFolder: string; // default target/cli_name
   appFolderName: string;
