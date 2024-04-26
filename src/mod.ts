@@ -3,8 +3,30 @@ import { get_elapsed_time, percentage } from "./utils.ts";
 import { setup } from "./setup.ts";
 import { setup_handle_file } from "./handle_file.ts";
 import { differenceInSeconds } from "date-fns";
+import { Effect } from "effect";
 
-export async function program(
+export const program = (raw_args: typeof Deno.args) =>
+  Effect.gen(function* (_) {
+    const fromSetup = yield* _(setup(raw_args));// ???
+
+    const { cache, logger, errorHandler: eh, config, ...data } = fromSetup;
+    const dirs: string[] = [];
+    const files: { name: string; reason: string }[] = [];
+
+    let error_count = 0;
+    let count = 0;
+    let processed = 0;
+    let skipped = 0;
+
+    let last_message_time = new Date();
+
+    const total_files = yield* _(get_numbers_of_files(data.targetFolder));
+    yield* _(Effect.log(`total number of files ${total_files}`));
+    const chunk = Math.round(total_files / 200);
+    const cache_size = yield* _(cache.size());
+  });
+
+export async function program_old(
   raw_args: typeof Deno.args
 ): Promise<() => Promise<void>> {
   const {
@@ -37,7 +59,7 @@ export async function program(
     logger.log(`No previous cache found...`);
   } else {
     logger.log(
-      `cache contains ${cache_size} files (${percentage(
+      `cache updated on ${cache.get_last_run()} and contains ${cache_size} files (${percentage(
         cache_size,
         total_files
       )})`
@@ -132,10 +154,28 @@ export async function program(
 }
 
 // dumb but superfast method, under 100 ms
-async function get_numbers_of_files(dir: string) {
-  let count = 0;
-  for await (const _entry of Deno.readDir(dir)) {
-    count++;
+function get_numbers_of_files(dir: string): Effect.Effect<number, DenoError> {
+  return Effect.tryPromise({
+    try: async () => {
+      let count = 0;
+      for await (const _entry of Deno.readDir(dir)) {
+        count++;
+      }
+      return count;
+    },
+    catch: (err) => new DenoError({ err }),
+  });
+}
+
+class DenoError {
+  readonly _tag = "DenoError";
+  err: Error;
+
+  constructor({ err }: { err: unknown }) {
+    if (err instanceof Error) {
+      this.err = err;
+    } else {
+      this.err = new Error(`unrecognized error`);
+    }
   }
-  return count;
 }
