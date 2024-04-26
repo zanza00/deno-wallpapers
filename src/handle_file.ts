@@ -2,7 +2,7 @@ import * as path from "std/path/mod.ts";
 import { get_image_dimensions, get_md5_hash } from "./utils.ts";
 import { Cache } from "./cache.ts";
 import { ErrorHandler } from "./errors.ts";
-import { Logger } from "./logger.ts";
+import { Legacy_Logger } from "./logger.ts";
 
 export function setup_handle_file({
   cache,
@@ -17,7 +17,7 @@ export function setup_handle_file({
   cache: Cache;
   data: { targetFolder: string; not_found_hash: string[] };
   files: { name: string; reason: string }[];
-  logger: Logger;
+  logger: Legacy_Logger;
   skipped: number;
   error_count: number;
   processed: number;

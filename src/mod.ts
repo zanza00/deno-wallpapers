@@ -3,11 +3,11 @@ import { get_elapsed_time, percentage } from "./utils.ts";
 import { setup } from "./setup.ts";
 import { setup_handle_file } from "./handle_file.ts";
 import { differenceInSeconds } from "date-fns";
-import { Effect } from "effect";
+import { Effect, Data } from "effect";
 
 export const program = (raw_args: typeof Deno.args) =>
   Effect.gen(function* (_) {
-    const fromSetup = yield* _(setup(raw_args));// ???
+    const fromSetup = yield* _(setup(raw_args)); // ???
 
     const { cache, logger, errorHandler: eh, config, ...data } = fromSetup;
     const dirs: string[] = [];
@@ -23,7 +23,7 @@ export const program = (raw_args: typeof Deno.args) =>
     const total_files = yield* _(get_numbers_of_files(data.targetFolder));
     yield* _(Effect.log(`total number of files ${total_files}`));
     const chunk = Math.round(total_files / 200);
-    const cache_size = yield* _(cache.size());
+    // const cache_size = yield* _(cache.size());
   });
 
 export async function program_old(
@@ -167,15 +167,6 @@ function get_numbers_of_files(dir: string): Effect.Effect<number, DenoError> {
   });
 }
 
-class DenoError {
-  readonly _tag = "DenoError";
-  err: Error;
-
-  constructor({ err }: { err: unknown }) {
-    if (err instanceof Error) {
-      this.err = err;
-    } else {
-      this.err = new Error(`unrecognized error`);
-    }
-  }
-}
+class DenoError extends Data.TaggedError("DenoError")<{
+  err: unknown;
+}> {}

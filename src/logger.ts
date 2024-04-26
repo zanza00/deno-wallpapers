@@ -2,6 +2,10 @@ import * as path from "std/path/mod.ts";
 import { date_file_fmt } from "./utils.ts";
 import { Config } from "./config.ts";
 
+import { Logger as EffectLogger } from "effect";
+
+export const Logger = EffectLogger.make(({ logLevel, message }) => {});
+
 type LoggerConfig = {
   std_out: boolean;
   date: Date;
@@ -16,7 +20,7 @@ type FileLoggerConfig =
       flush_after?: number;
     };
 
-export class Logger {
+export class Legacy_Logger {
   #std_out: boolean;
   #file: string | false;
   #messages: string[];

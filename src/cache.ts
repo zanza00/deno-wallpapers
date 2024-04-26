@@ -1,4 +1,4 @@
-import { Logger } from "./logger.ts";
+import { Legacy_Logger } from "./logger.ts";
 import { z } from "zod";
 import { Config } from "./config.ts";
 
@@ -29,10 +29,10 @@ const empty_cache: CacheData = {
 export class Cache {
   #files: CacheData["files"];
   #meta: CacheData["meta"];
-  #logger: Logger;
+  #logger: Legacy_Logger;
   #config: Config;
 
-  constructor({ logger, config }: { logger: Logger; config: Config }) {
+  constructor({ logger, config }: { logger: Legacy_Logger; config: Config }) {
     this.#files = empty_cache.files;
     this.#meta = empty_cache.meta;
     this.#logger = logger;
