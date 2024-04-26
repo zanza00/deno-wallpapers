@@ -30,14 +30,18 @@ export function setup(raw_args: typeof Deno.args) {
       const errorHandler = new ErrorHandler({ start_time, config });
 
       function teardown(message: string, { prune }: { prune: boolean }) {
-        return async () => {
-          const end = new Date();
-          const elapsed = get_elapsed_time(start_time, end);
+        return Effect.tryPromise({
+          try: async () => {
+            const end = new Date();
+            const elapsed = get_elapsed_time(start_time, end);
 
-          logger.log(`time elapsed: ${elapsed}`);
-          await cache.teardown({ prune });
-          await logger.teardown(message);
-        };
+            logger.log(`time elapsed: ${elapsed}`);
+            await cache.teardown({ prune });
+            await logger.teardown(message);
+          },
+          catch: (err) =>
+            new SetupError({ err, message: "failed to teardown" }),
+        });
       }
 
       Deno.addSignalListener("SIGINT", async () => {

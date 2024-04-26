@@ -24,18 +24,18 @@ export const program = (raw_args: typeof Deno.args) =>
     let last_message_time = new Date();
 
     const total_files = yield* _(get_numbers_of_files(data.targetFolder));
-    yield* _(Effect.log(`total number of files ${total_files}`));
+    logger.log(`total number of files ${total_files}`);
     const chunk = Math.round(total_files / 200);
     const cache_size = yield* _(Effect.promise(() => cache.size()));
-    yield* Effect.logInfo(
+    logger.log(
       `Let's parse some files, starting on: ${data.start_time.toISOString()}`
     );
 
-    yield* Effect.logInfo(`Found ${total_files} files to handle`);
+    logger.log(`Found ${total_files} files to handle`);
     if (cache.get_last_run() === "never") {
-      yield* Effect.logInfo(`No previous cache found...`);
+      logger.log(`No previous cache found...`);
     } else {
-      yield* Effect.logInfo(
+      logger.log(
         `cache updated on ${cache.get_last_run()} and contains ${cache_size} files (${percentage(
           cache_size,
           total_files
@@ -104,9 +104,11 @@ export const program = (raw_args: typeof Deno.args) =>
       );
     }
 
-    data.teardown(`finished on ${new Date().toISOString()}`, {
-      prune: true,
-    });
+    yield* _(
+      data.teardown(`finished on ${new Date().toISOString()}`, {
+        prune: true,
+      })
+    );
   });
 
 function delete_files_or_folders(
