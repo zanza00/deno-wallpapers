@@ -85,36 +85,60 @@ export const program = (raw_args: typeof Deno.args) =>
     } else {
       logger.log(`Found noting to delete`);
     }
-    yield* _(delete_empty_folders(dirs, logger, data));
-  });
+    const deleted_folders = yield* _(
+      delete_files_or_folders(
+        dirs.map((x) => ({ name: x, reason: "folder" })),
+        logger,
+        data.targetFolder,
+        "folder"
+      )
+    );
 
-function delete_empty_folders(
-  dirs: string[],
-  logger: Legacy_Logger,
-  data: {
-    start_time: Date;
-    not_found_hash: string[];
-    targetFolder: string;
-    teardown: (
-      message: string,
-      { prune }: { prune: boolean }
-    ) => () => Promise<void>;
-  }
-) {
-  return Effect.gen(function* (_) {
-    for (const dir of dirs) {
-      logger.log(`[DIR] removing ${dir}`);
-      yield* _(
-        Effect.tryPromise({
-          try: () =>
-            Deno.remove(path.join(data.targetFolder, dir), {
-              recursive: true,
-            }),
-          catch: (err) => new DenoError({ err, step: "delete empty dir" }),
-        })
+    const deleted_files = yield* _(
+      delete_files_or_folders(files, logger, data.targetFolder, "folder")
+    );
+
+    if (error_count > 0) {
+      logger.log(
+        `${error_count} errors found, see ${eh.get_error_filename()} file`
       );
     }
+
+    data.teardown(`finished on ${new Date().toISOString()}`, {
+      prune: true,
+    });
   });
+
+function delete_files_or_folders(
+  targets: {
+    name: string;
+    reason: string;
+  }[],
+  logger: Legacy_Logger,
+  targetFolder: string,
+  kind: "folder" | "file"
+) {
+  return Effect.partition(targets, (t) =>
+    Effect.tryPromise({
+      try: async () => {
+        try {
+          if (kind === "folder") {
+            await Deno.remove(path.join(targetFolder, t.name), {
+              recursive: true,
+            });
+            logger.log(`[DIR] removing ${t.name}`);
+          } else {
+            await Deno.remove(path.join(targetFolder, t.name));
+            logger.log(`[files] removing ${t.name} because: ${t.reason}`);
+          }
+          return t.name;
+        } catch (error) {
+          console.log("error", error);
+        }
+      },
+      catch: (err) => new DenoError({ err, step: "delete empty dir" }),
+    })
+  );
 }
 
 function the_ciccia({
@@ -197,133 +221,6 @@ function the_ciccia({
       return { count, last_message_time };
     },
     catch: (err) => new DenoError({ err, step: "the_ciccia" }),
-  });
-}
-
-export async function program_old(
-  raw_args: typeof Deno.args
-): Promise<() => Promise<void>> {
-  const {
-    cache,
-    logger,
-    errorHandler: eh,
-    config,
-    ...data
-  } = await setup(raw_args);
-
-  const dirs: string[] = [];
-  const files: { name: string; reason: string }[] = [];
-
-  let error_count = 0;
-  let count = 0;
-  let processed = 0;
-  let skipped = 0;
-
-  let last_message_time = new Date();
-
-  const total_files = await get_numbers_of_files(data.targetFolder);
-  const chunk = Math.round(total_files / 200);
-  const cache_size = await cache.size();
-  logger.log(
-    `Let's parse some files, starting on:`,
-    data.start_time.toISOString()
-  );
-  logger.log(`Found ${total_files} files to handle`);
-  if (cache.get_last_run() === "never") {
-    logger.log(`No previous cache found...`);
-  } else {
-    logger.log(
-      `cache updated on ${cache.get_last_run()} and contains ${cache_size} files (${percentage(
-        cache_size,
-        total_files
-      )})`
-    );
-  }
-
-  const handle_file = setup_handle_file({
-    cache,
-    data,
-    files,
-    logger,
-    skipped,
-    error_count,
-    processed,
-    eh,
-  });
-
-  for await (const entry of Deno.readDir(data.targetFolder)) {
-    if (entry.isDirectory && entry.name !== config.appFolderName) {
-      dirs.push(entry.name);
-    }
-    if (entry.isFile) {
-      ({ skipped, error_count, processed } = await handle_file(entry));
-    }
-    count++;
-
-    if (
-      count % chunk === 0 &&
-      differenceInSeconds(new Date(), last_message_time) > 5
-    ) {
-      logger.log(
-        `${percentage(
-          count,
-          total_files
-        )} files processed [elapsed time: ${get_elapsed_time(
-          data.start_time,
-          new Date()
-        )}]`
-      );
-
-      if (dirs.length + files.length > 0) {
-        logger.log(
-          `found ${dirs.length} dirs and ${files.length} files to delete`
-        );
-      }
-
-      last_message_time = new Date();
-
-      cache.save_progress({ prune: false });
-    }
-  }
-  logger.log(`==========`);
-  logger.log(`Processed ${processed} new files`);
-  if (dirs.length + files.length > 0) {
-    logger.log(
-      `found ${dirs.length} (${percentage(dirs.length, total_files)}) dirs`
-    );
-    logger.log(
-      `found ${files.length} (${percentage(files.length, total_files)}) files`
-    );
-  } else {
-    logger.log(`Found noting to delete`);
-  }
-
-  for (const dir of dirs) {
-    try {
-      logger.log(`[DIR] removing ${dir}`);
-      await Deno.remove(path.join(data.targetFolder, dir), {
-        recursive: true,
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  }
-  for (const f of files) {
-    try {
-      logger.log(`[files] removing ${f.name} because: ${f.reason}`);
-      await Deno.remove(path.join(data.targetFolder, f.name));
-    } catch (error) {
-      console.error(error);
-    }
-  }
-  if (error_count > 0) {
-    logger.log(
-      `${error_count} errors found, see ${eh.get_error_filename()} file`
-    );
-  }
-
-  return data.teardown(`finished on ${new Date().toISOString()}`, {
-    prune: true,
   });
 }
 
