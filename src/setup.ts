@@ -46,7 +46,7 @@ export function setup(raw_args: typeof Deno.args) {
 
 			Deno.addSignalListener("SIGINT", async () => {
 				logger.log("to exit immediately use CTRL+C again");
-				await teardown("gracefully exiting", { prune: false })();
+				Effect.runPromise(teardown("gracefully exiting", { prune: false }));
 				setTimeout(() => {
 					Deno.exit();
 				}, 300);
