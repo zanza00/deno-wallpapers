@@ -3,36 +3,30 @@ import type { Cache } from "./cache.ts";
 import type { ErrorHandler } from "./errors.ts";
 import type { Legacy_Logger } from "./logger.ts";
 import { get_image_dimensions, get_md5_hash } from "./utils.ts";
+import { Effect } from "effect";
+import { CounterState } from "./CounterState.ts";
 
 export function setup_handle_file({
 	cache,
 	data,
 	files,
 	logger,
-	skipped,
-	error_count,
-	processed,
 	eh,
 }: {
 	cache: Cache;
 	data: { targetFolder: string; not_found_hash: string[] };
 	files: { name: string; reason: string }[];
 	logger: Legacy_Logger;
-	skipped: number;
-	error_count: number;
-	processed: number;
 	eh: ErrorHandler;
-}): (
-	entry: Deno.DirEntry,
-) => Promise<{ skipped: number; error_count: number; processed: number }> {
+}) {
 	return async (entry: Deno.DirEntry) => {
-		try {
-			const from_cache = await cache.get(entry.name);
+		return Effect.gen(function* () {
+			const from_cache = yield* cache.get(entry.name);
 			if (from_cache === null) {
 				let to_be_deleted: false | string = false;
 				const fullpath = path.resolve(data.targetFolder, entry.name);
-				const stats = await Deno.stat(fullpath);
-				const content = await Deno.readFile(fullpath);
+				const stats = yield* Effect.tryPromise(() => Deno.stat(fullpath));
+				const content = yield* Effect.tryPromise(() => Deno.readFile(fullpath));
 
 				// the file is somethink like 20kb, spare unnecessary calculations
 				if (stats.size < 30000) {
@@ -54,7 +48,7 @@ export function setup_handle_file({
 						to_be_deleted = reason;
 					}
 				}
-				processed++;
+				yield* CounterState.inc("processed");
 				cache.set({
 					key: entry.name,
 					value: to_be_deleted ? to_be_deleted : "",
@@ -65,15 +59,14 @@ export function setup_handle_file({
 					logger.log(`found a file to delete from cache -> ${entry.name}`);
 					logger.log(`                                  -> ${from_cache}`);
 				}
-				skipped++;
+				yield* CounterState.inc("skipped");
 			}
-		} catch (error) {
-			error_count++;
-			await eh.write_error_file({
-				entry,
-				error,
-			});
-		}
-		return { skipped, error_count, processed };
+		});
+
+		// error_count++;
+		// await eh.write_error_file({
+		// 	entry,
+		// 	error,
+		// });
 	};
 }

@@ -23,7 +23,7 @@ export const program = (raw_args: typeof Deno.args) =>
 		const total_files = yield* get_numbers_of_files(data.targetFolder);
 		logger.log(`total number of files ${total_files}`);
 		const chunk = Math.round(total_files / 200);
-		const cache_size = yield* _(Effect.promise(() => cache.size()));
+		const cache_size = yield* cache.size;
 		logger.log(
 			`Let's parse some files, starting on: ${data.start_time.toISOString()}`,
 		);
@@ -225,7 +225,7 @@ function get_numbers_of_files(dir: string): Effect.Effect<number, DenoError> {
 	});
 }
 
-class DenoError extends Data.TaggedError("DenoError")<{
+export class DenoError extends Data.TaggedError("DenoError")<{
 	err: unknown;
 	step: string;
 }> {}

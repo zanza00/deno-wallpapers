@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { Config } from "./config.ts";
 import type { Legacy_Logger } from "./logger.ts";
+import { Effect } from "effect";
+import { DenoError } from "./mod.ts";
 
 const cacheDataSchema = z.object({
 	meta: z.object({
@@ -29,41 +31,39 @@ const empty_cache: CacheData = {
 export class Cache {
 	#files: CacheData["files"];
 	#meta: CacheData["meta"];
-	#logger: Legacy_Logger;
 	#config: Config;
 
-	constructor({ logger, config }: { logger: Legacy_Logger; config: Config }) {
+	constructor({ config }: { config: Config }) {
 		this.#files = empty_cache.files;
 		this.#meta = empty_cache.meta;
-		this.#logger = logger;
 		this.#config = config;
 	}
 
-	async init(): Promise<void> {
-		try {
-			if (this.#config.cache !== false) {
-				const filecontent = await Deno.readTextFile(this.#config.cache);
-				const parsed = JSON.parse(filecontent);
-				const zodded = cacheDataSchema.parse(parsed);
+	init = Effect.gen(this, function* () {
+		if (this.#config.cache !== false) {
+			const filecontent = yield* Effect.tryPromise({
+				try: () =>
+					Deno.readTextFile(
+						//@ts-expect-error new context does not see that is already only string
+						this.#config.cache,
+					),
+				catch: (err) => new DenoError({ err, step: "read cache file" }),
+			});
+			const parsed = JSON.parse(filecontent);
+			const zodded = cacheDataSchema.parse(parsed);
 
-				this.#files = zodded.files;
-				this.#meta = zodded.meta;
-			}
-		} catch (__error) {
-			// emptyblock
+			this.#files = zodded.files;
+			this.#meta = zodded.meta;
 		}
-	}
+	});
+
 	async teardown({ prune }: { prune: boolean }): Promise<void> {
 		if (this.#config.cache !== false) {
 			await this.save_progress({ prune });
 		}
 	}
 
-	size(): Promise<number> {
-		return new Promise<number>((resolve) => {
-			resolve(Object.keys(this.#files).length);
-		});
-	}
+	size = Effect.sync(() => Object.keys(this.#files).length);
 
 	#get_files({ prune = false }: { prune: boolean }) {
 		if (prune) {
@@ -104,10 +104,10 @@ export class Cache {
 		}
 	}
 
-	get(n: string): Promise<string | null> {
-		return new Promise((resolve) => {
+	get(n: string): Effect.Effect<string | null, never, never> {
+		return Effect.sync(() => {
 			const found = this.#files[n];
-			resolve(found ?? null);
+			return found ?? null;
 		});
 	}
 	set({ key, value }: { key: string; value: string }): Promise<boolean> {
