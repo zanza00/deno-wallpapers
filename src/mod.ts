@@ -1,12 +1,14 @@
 import { differenceInSeconds } from "date-fns";
 import { Data, Effect } from "effect";
 import * as path from "std/path/mod.ts";
+
 import type { Cache } from "./cache.ts";
 import type { Config } from "./config.ts";
 import { setup_handle_file } from "./handle_file.ts";
 import type { Legacy_Logger } from "./logger.ts";
 import { setup } from "./setup.ts";
 import { get_elapsed_time, percentage } from "./utils.ts";
+import { CounterState } from "./CounterState.ts";
 
 export const program = (raw_args: typeof Deno.args) =>
 	Effect.gen(function* (_) {
@@ -16,10 +18,7 @@ export const program = (raw_args: typeof Deno.args) =>
 		const dirs: string[] = [];
 		const files: { name: string; reason: string }[] = [];
 
-		const error_count = 0;
-		let count = 0;
-		const processed = 0;
-		const skipped = 0;
+		const counterState = yield* _(CounterState);
 
 		let last_message_time = new Date();
 
@@ -48,22 +47,15 @@ export const program = (raw_args: typeof Deno.args) =>
 			data,
 			files,
 			logger,
-			skipped,
-			error_count,
-			processed,
 			eh,
 		});
 
-		({ count, last_message_time } = yield* _(
+		yield* _(
 			the_ciccia({
 				data,
 				config,
 				dirs,
-				skipped,
-				error_count,
-				processed,
 				handle_file,
-				count,
 				chunk,
 				last_message_time,
 				logger,
@@ -71,7 +63,7 @@ export const program = (raw_args: typeof Deno.args) =>
 				files,
 				cache,
 			}),
-		));
+		);
 
 		logger.log("==========");
 		logger.log(`Processed ${processed} new files`);
