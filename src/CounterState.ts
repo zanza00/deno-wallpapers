@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Ref } from "effect";
+import { Effect, Layer, Ref } from "effect";
 
 type state = {
 	count: number;
@@ -7,14 +7,14 @@ type state = {
 	skipped: number;
 };
 
-interface CounterStateI {
+type ICounterState = {
 	readonly inc: (counter: keyof state) => Effect.Effect<void>;
 	get: Effect.Effect<state>;
-}
+};
 
-export class CounterState extends Context.Tag("CounterState")<
+export class CounterState extends Effect.Tag("CounterState")<
 	CounterState,
-	CounterStateI
+	ICounterState
 >() {}
 
 const initialState = Ref.make({
@@ -24,27 +24,18 @@ const initialState = Ref.make({
 	skipped: 0,
 });
 
-class CounterStateImpl implements CounterStateI {
-	#value: Ref.Ref<state>;
-	get: Effect.Effect<state, never, never>;
+const make = Effect.gen(function* () {
+	const state = yield* initialState;
 
-	constructor(value: Ref.Ref<state>) {
-		this.#value = value;
-		this.get = Ref.get(this.#value);
-	}
+	return {
+		get: Ref.get(state),
+		inc: (counter: keyof state) =>
+			Ref.update(state, (old_state) => {
+				const new_state = { ...old_state };
+				new_state[counter] = old_state[counter] + 1;
+				return new_state;
+			}),
+	} satisfies ICounterState;
+});
 
-	inc(counter: keyof state) {
-		return Ref.update(this.#value, (old_state) => {
-			const new_state = { ...old_state };
-			new_state[counter] = old_state[counter] + 1;
-			return new_state;
-		});
-	}
-}
-
-export const CounterStateLive = Layer.effect(
-	CounterState,
-	initialState.pipe(
-		Effect.map((state) => CounterState.of(new CounterStateImpl(state))),
-	),
-);
+export const CounterStateLive = Layer.effect(CounterState, make);

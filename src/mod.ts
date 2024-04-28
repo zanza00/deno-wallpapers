@@ -18,11 +18,9 @@ export const program = (raw_args: typeof Deno.args) =>
 		const dirs: string[] = [];
 		const files: { name: string; reason: string }[] = [];
 
-		const counterState = yield* _(CounterState);
-
 		let last_message_time = new Date();
 
-		const total_files = yield* _(get_numbers_of_files(data.targetFolder));
+		const total_files = yield* get_numbers_of_files(data.targetFolder);
 		logger.log(`total number of files ${total_files}`);
 		const chunk = Math.round(total_files / 200);
 		const cache_size = yield* _(Effect.promise(() => cache.size()));
@@ -92,7 +90,9 @@ export const program = (raw_args: typeof Deno.args) =>
 		const deleted_files = yield* _(
 			delete_files_or_folders(files, logger, data.targetFolder, "folder"),
 		);
-
+		const { count, error_count, processed, skipped } = yield* _(
+			CounterState.get,
+		);
 		if (error_count > 0) {
 			logger.log(
 				`${error_count} errors found, see ${eh.get_error_filename()} file`,
@@ -118,20 +118,16 @@ function delete_files_or_folders(
 	return Effect.partition(targets, (t) =>
 		Effect.tryPromise({
 			try: async () => {
-				try {
-					if (kind === "folder") {
-						await Deno.remove(path.join(targetFolder, t.name), {
-							recursive: true,
-						});
-						logger.log(`[DIR] removing ${t.name}`);
-					} else {
-						await Deno.remove(path.join(targetFolder, t.name));
-						logger.log(`[files] removing ${t.name} because: ${t.reason}`);
-					}
-					return t.name;
-				} catch (error) {
-					console.log("error", error);
+				if (kind === "folder") {
+					await Deno.remove(path.join(targetFolder, t.name), {
+						recursive: true,
+					});
+					logger.log(`[DIR] removing ${t.name}`);
+				} else {
+					await Deno.remove(path.join(targetFolder, t.name));
+					logger.log(`[files] removing ${t.name} because: ${t.reason}`);
 				}
+				return t.name;
 			},
 			catch: (err) => new DenoError({ err, step: "delete empty dir" }),
 		}),
@@ -145,13 +141,10 @@ function the_ciccia({
 	count,
 	data,
 	dirs,
-	error_count,
 	files,
 	handle_file,
 	last_message_time,
 	logger,
-	processed,
-	skipped,
 	total_files,
 }: {
 	data: {
@@ -165,9 +158,6 @@ function the_ciccia({
 	};
 	config: Config;
 	dirs: string[];
-	skipped: number;
-	error_count: number;
-	processed: number;
 	handle_file: (
 		entry: Deno.DirEntry,
 	) => Promise<{ skipped: number; error_count: number; processed: number }>;
