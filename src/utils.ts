@@ -13,7 +13,7 @@ export function get_image_dimensions(data: Uint8Array) {
 }
 
 export function percentage(count: number, total_files: number): string {
-  return (count / total_files * 100).toFixed(2) + "%";
+  return ((count / total_files) * 100).toFixed(2) + "%";
 }
 
 export function date_file_fmt(d: Date) {
@@ -27,8 +27,10 @@ export function get_elapsed_time(start_time: Date, end: Date) {
   });
 
   if (
-    (duration.seconds ?? 0) + (duration.minutes ?? 0) +
-        (duration.hours ?? 0) === 0
+    (duration.seconds ?? 0) +
+      (duration.minutes ?? 0) +
+      (duration.hours ?? 0) ===
+    0
   ) {
     const diff = Number(end) - Number(start_time);
     return `${getMilliseconds(diff)} milliseconds`;

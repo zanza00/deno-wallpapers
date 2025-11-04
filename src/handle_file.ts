@@ -3,6 +3,7 @@ import { get_image_dimensions, get_md5_hash } from "./utils.ts";
 import { Cache } from "./cache.ts";
 import { ErrorHandler } from "./errors.ts";
 import { Logger } from "./logger.ts";
+import { Config } from "./config.ts";
 
 export function setup_handle_file({
   cache,
@@ -13,6 +14,7 @@ export function setup_handle_file({
   error_count,
   processed,
   eh,
+  config,
 }: {
   cache: Cache;
   data: { targetFolder: string; not_found_hash: string[] };
@@ -22,6 +24,7 @@ export function setup_handle_file({
   error_count: number;
   processed: number;
   eh: ErrorHandler;
+  config: Config;
 }): (
   entry: Deno.DirEntry
 ) => Promise<{ skipped: number; error_count: number; processed: number }> {
@@ -45,8 +48,8 @@ export function setup_handle_file({
           }
         } else {
           const dimensions = get_image_dimensions(content);
-          if (dimensions.width < 1920 || dimensions.height < 1080) {
-            const reason = `too_small: [${dimensions.width}x${dimensions.height}]`;
+          if (dimensions.width < config.minWidth || dimensions.height < config.minHeight) {
+            const reason = `too_small: [${dimensions.width}x${dimensions.height}] (min: ${config.minWidth}x${config.minHeight})`;
             files.push({
               name: entry.name,
               reason,

@@ -1,12 +1,11 @@
-import { get_elapsed_time, get_md5_hash } from "./utils.ts";
-import * as path from "std/path/mod.ts";
+import { get_elapsed_time } from "./utils.ts";
 import { initializeImageMagick } from "imagemagick";
 import { Cache } from "./cache.ts";
 import { Logger } from "./logger.ts";
 import { ErrorHandler } from "./errors.ts";
 import { get_config } from "./config.ts";
 
-// const not_found_image_path = path.resolve(".\\assets\\not_found.png");
+// const not_found_image_path = path.join("assets", "not_found.png");
 
 export async function setup(raw_args: typeof Deno.args) {
   const config = get_config(raw_args);
@@ -21,7 +20,7 @@ export async function setup(raw_args: typeof Deno.args) {
       file: config.writeLogFile,
       std_out: config.logs,
     },
-    config
+    config,
   );
   const cache = new Cache({ logger, config });
   const errorHandler = new ErrorHandler({ start_time, config });
@@ -37,13 +36,20 @@ export async function setup(raw_args: typeof Deno.args) {
     };
   }
 
-  Deno.addSignalListener("SIGINT", async () => {
+  const handleSignal = async () => {
     logger.log("to exit immediately use CTRL+C again");
     await teardown(`gracefully exiting`, { prune: false })();
     setTimeout(() => {
       Deno.exit();
     }, 300);
-  });
+  };
+
+  Deno.addSignalListener("SIGINT", handleSignal);
+
+  // Add SIGTERM support for Unix systems (Linux/macOS)
+  if (Deno.build.os !== "windows") {
+    Deno.addSignalListener("SIGTERM", handleSignal);
+  }
 
   await cache.init();
   await initializeImageMagick();

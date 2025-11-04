@@ -53,6 +53,7 @@ export async function program(
     error_count,
     processed,
     eh,
+    config,
   });
 
   for await (const entry of Deno.readDir(data.targetFolder)) {
